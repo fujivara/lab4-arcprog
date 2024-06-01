@@ -1,4 +1,4 @@
-package main
+package balancer
 
 import (
 	"context"
@@ -24,7 +24,7 @@ var (
 
 var (
 	timeout     = time.Duration(*timeoutSec) * time.Second
-	serversPool = map[string]int{
+	ServersPool = map[string]int{
 		"server1:8080": 0,
 		"server2:8080": 0,
 		"server3:8080": 0,
@@ -53,7 +53,7 @@ func health(dst string) bool {
 }
 
 func updateServerBytes(bytes int, server string) {
-	serversPool[server] += bytes
+	ServersPool[server] += bytes
 }
 
 func countResponseBytes(res *http.Response) int {
@@ -61,7 +61,7 @@ func countResponseBytes(res *http.Response) int {
 	return len(body)
 }
 
-func forward(dst string, rw http.ResponseWriter, r *http.Request) error {
+func Forward(dst string, rw http.ResponseWriter, r *http.Request) error {
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 
@@ -105,11 +105,11 @@ func forward(dst string, rw http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func getServer() string {
+func GetServer() string {
 	var minServer string
 	minValue := int(^uint(0) >> 1) // Initialize with maximum int value
 
-	for server, value := range serversPool {
+	for server, value := range ServersPool {
 		if value < minValue {
 			minValue = value
 			minServer = server
@@ -122,7 +122,7 @@ func main() {
 	flag.Parse()
 
 	// TODO: Використовуйте дані про стан сервреа, щоб підтримувати список тих серверів, яким можна відправляти ззапит.
-	for _, server := range make([]string, 0, len(serversPool)) {
+	for _, server := range make([]string, 0, len(ServersPool)) {
 		server := server
 		go func() {
 			for range time.Tick(10 * time.Second) {
@@ -132,8 +132,8 @@ func main() {
 	}
 
 	frontend := httptools.CreateServer(*port, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		serverName := getServer()
-		err := forward(serverName, rw, r)
+		serverName := GetServer()
+		err := Forward(serverName, rw, r)
 		if err != nil {
 			return
 		}

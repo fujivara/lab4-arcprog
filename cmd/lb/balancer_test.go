@@ -1,4 +1,4 @@
-package main
+package balancer
 
 import (
 	"io/ioutil"
@@ -12,14 +12,14 @@ import (
 )
 
 func TestGetServer(t *testing.T) {
-	serversPool = map[string]int{
+	ServersPool = map[string]int{
 		"server1:8080": 100,
 		"server2:8080": 50,
 		"server3:8080": 75,
 	}
 
 	expectedServer := "server2:8080"
-	actualServer := getServer()
+	actualServer := GetServer()
 	assert.Equal(t, expectedServer, actualServer, "getServer should return the server with the least traffic")
 }
 
@@ -47,7 +47,7 @@ func TestForward(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test", nil)
 	w := httptest.NewRecorder()
 
-	err := forward("server1:8080", w, req)
+	err := Forward("server1:8080", w, req)
 	assert.NoError(t, err, "forward should not return an error")
 
 	resp := w.Result()
@@ -60,7 +60,7 @@ func TestMainHandler(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 
-	serversPool = map[string]int{
+	ServersPool = map[string]int{
 		"server1:8080": 100,
 		"server2:8080": 50,
 		"server3:8080": 75,
@@ -73,8 +73,8 @@ func TestMainHandler(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	handler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		serverName := getServer()
-		err := forward(serverName, rw, r)
+		serverName := GetServer()
+		err := Forward(serverName, rw, r)
 		if err != nil {
 			return
 		}
