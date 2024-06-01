@@ -62,7 +62,9 @@ func countResponseBytes(res *http.Response) int {
 }
 
 func forward(dst string, rw http.ResponseWriter, r *http.Request) error {
-	ctx, _ := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
 	fwdRequest := r.Clone(ctx)
 	fwdRequest.RequestURI = ""
 	fwdRequest.URL.Host = dst
@@ -70,31 +72,37 @@ func forward(dst string, rw http.ResponseWriter, r *http.Request) error {
 	fwdRequest.Host = dst
 
 	resp, err := http.DefaultClient.Do(fwdRequest)
-	if err == nil {
-		for k, values := range resp.Header {
-			for _, value := range values {
-				rw.Header().Add(k, value)
-			}
-		}
-		if *traceEnabled {
-			rw.Header().Set("lb-from", dst)
-		}
-		log.Println("fwd", resp.StatusCode, resp.Request.URL)
-		rw.WriteHeader(resp.StatusCode)
-		defer resp.Body.Close()
-
-		updateServerBytes(countResponseBytes(resp), dst)
-
-		_, err := io.Copy(rw, resp.Body)
-		if err != nil {
-			log.Printf("Failed to write response: %s", err)
-		}
-		return nil
-	} else {
+	if err != nil {
 		log.Printf("Failed to get response from %s: %s", dst, err)
 		rw.WriteHeader(http.StatusServiceUnavailable)
 		return err
 	}
+	defer resp.Body.Close()
+
+	for k, values := range resp.Header {
+		for _, value := range values {
+			rw.Header().Add(k, value)
+		}
+	}
+	if *traceEnabled {
+		rw.Header().Set("lb-from", dst)
+	}
+	log.Println("fwd", resp.StatusCode, resp.Request.URL)
+	rw.WriteHeader(resp.StatusCode)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Failed to read response body: %s", err)
+		return err
+	}
+
+	updateServerBytes(len(body), dst)
+
+	_, err = rw.Write(body)
+	if err != nil {
+		log.Printf("Failed to write response: %s", err)
+	}
+	return nil
 }
 
 func getServer() string {
