@@ -41,4 +41,23 @@ func TestLoadBalancerAlgorithm(t *testing.T) {
 	}
 }
 
-func BenchmarkBalancer(b *testing.B) {}
+func BenchmarkBalancer(b *testing.B) {
+	b.ResetTimer()
+	loadBalancerAddress := "http://balancer:8090/api/v1/some-data"
+
+	req, err := http.NewRequest("GET", loadBalancerAddress, nil)
+	if err != nil {
+		b.Fatalf("Failed to create request: %v", err)
+	}
+
+	b.RunParallel(func(pb *testing.PB) {
+		client := http.Client{}
+		for pb.Next() {
+			resp, err := client.Do(req)
+			if err != nil {
+				b.Fatalf("Failed to send request to load balancer: %v", err)
+			}
+			resp.Body.Close()
+		}
+	})
+}
