@@ -1,0 +1,3 @@
+[submodule "golang-db"]
+	path = golang-db
+	url = https://github.com/fujivara/golang-db
