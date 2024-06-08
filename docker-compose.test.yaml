@@ -1,18 +1,47 @@
 version: '2.1'
 
+networks:
+  servers:
+
 services:
-  test:
-    build:
-      context: .
-      dockerfile: Dockerfile.test
+  balancer:
+    build: .
+    command: "lb"
     networks:
       - servers
-    depends_on:
-      - server1
-      - server2
-      - server3
-      - balancer
+    ports:
+      - "8090:8090"
 
-  balancer:
-    # Для тестів включаємо режим відлагодження, коли балансувальник додає інформацію, кому було відправлено запит.
-    command: ["lb", "--trace=true"]
+  server1:
+    build: ./cmd/server
+    networks:
+      - servers
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+  server2:
+    build: ./cmd/server
+    networks:
+      - servers
+    ports:
+      - "8081:8080"
+    depends_on:
+      - db
+
+  server3:
+    build: ./cmd/server
+    networks:
+      - servers
+    ports:
+      - "8082:8080"
+    depends_on:
+      - db
+
+  db:
+    build: ./cmd/db
+    networks:
+      - servers
+    ports:
+      - "8083:8081"
